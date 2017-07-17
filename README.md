@@ -102,3 +102,15 @@ $ etcdctl watch etcdhcp::nics::leased::08:9e:08:b5:af:01
 Beware that renewals will cause updates to the nic key (updating/changing the
 lease to one with a more recent expiry). make sure to watch for
 creation/deletion events only.
+
+Want to give a specific device a specific ip? Just associate the two, and any
+DHCP discovery request will pick up the existing association.
+
+```
+$ etcdctl put etcdhcp::nics::leased::08:9e:08:b5:af:01 10.6.9.2
+$ etcdctl put etcdhcp::ips::leased::10.6.9.2 08:9e:08:b5:af:01
+$ etcdctl delete etcdhcp::ips::free::10.6.9.2
+```
+
+Warning: the leased keys have ttls set when a lease is issued, so you should set
+this up in a cron or something.
