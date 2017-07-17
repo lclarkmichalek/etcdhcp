@@ -64,7 +64,7 @@ stuff working by writing to etcd directly.
 
 Like all ~~good~~ cloud native software, etcDHCP exports Prometheus metrics on
 `:9842`. There's also pprof endpoints exposed. I didn't implement a readiness or
-liveness endpoint, as um, well they'd be a bit pointless. Also no gracefull
+liveness endpoint, as um, well they'd be a bit pointless. Also no graceful
 shutdowns because github.com/krolaw/dhcp4 doesn't support context yet.
 
 ## etcd structure
@@ -90,4 +90,15 @@ $ for i in `seq 200 220`; do ./etcdctl put etcdhcp::ips::free::10.6.9.$i 10.6.9.
 
 Warning: IPs that aren't in the range of a running server will gradually be
 phased out. They'll be removed when they are picked up by a client, and that
-client disconnects.
+client allows the lease to expire.
+
+Want to react to a device connecting? Watch the nic entry for the device's MAC
+address:
+
+```
+$ etcdctl watch etcdhcp::nics::leased::08:9e:08:b5:af:01
+```
+
+Beware that renewals will cause updates to the nic key (updating/changing the
+lease to one with a more recent expiry). make sure to watch for
+creation/deletion events only.
