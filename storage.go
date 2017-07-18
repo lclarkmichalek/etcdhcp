@@ -160,10 +160,15 @@ func (h *DHCPHandler) leaseIP(ctx context.Context, ip net.IP, nic string, ttl ti
 		// if the ip was previously free
 		etcdutil.KeyExists(freeIPKey),
 	).Then(
-		// Unfree it, and associate it with this nic
-		etcd.OpDelete(freeIPKey),
-		etcd.OpPut(leasedIPKey, nic, etcd.WithLease(lease.ID)),
-		etcd.OpPut(leasedNicKey, ip.String(), etcd.WithLease(lease.ID)),
+		etcd.OpTxn([]etcd.Cmp{
+			etcdutil.KeyMissing(leasedIPKey),
+			etcdutil.KeyMissing(leasedNicKey),
+		}, []etcd.Op{
+			// Unfree it, and associate it with this nic
+			etcd.OpDelete(freeIPKey),
+			etcd.OpPut(leasedIPKey, nic, etcd.WithLease(lease.ID)),
+			etcd.OpPut(leasedNicKey, ip.String(), etcd.WithLease(lease.ID)),
+		}, nil),
 	).Else(
 		// Otherwise, we're _probably_ renewing it, so check that it's currently
 		// associated with us
@@ -180,9 +185,9 @@ func (h *DHCPHandler) leaseIP(ctx context.Context, ip net.IP, nic string, ttl ti
 		return errors.Wrap(err, "could not update for leased ip")
 	}
 
-	// If we did an else then another else, we failed to renew the lease
-	if !res.Succeeded &&
-		!res.Responses[0].Response.(*etcdpb.ResponseOp_ResponseTxn).ResponseTxn.Succeeded {
+	// If we did an else in the nested transaction, we failed to actually update
+	// the lease
+	if !res.Responses[0].Response.(*etcdpb.ResponseOp_ResponseTxn).ResponseTxn.Succeeded {
 		return errors.New("ip is no longer free")
 	}
 
